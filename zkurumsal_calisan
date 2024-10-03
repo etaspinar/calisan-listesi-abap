@@ -1,0 +1,943 @@
+*&---------------------------------------------------------------------*
+*& Report Z_KURUMSAL_CALISAN_LISTESI
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_kurumsal_calisan_listesi.
+
+DATA: gv_ad      TYPE char20,
+      gv_soyad   TYPE char20,
+      gv_id      TYPE int4,
+      gv_sehir   TYPE char15,
+      gv_mail    TYPE char50,
+      gv_telefon TYPE char20,
+      gv_dogum   TYPE datum.
+
+DATA: gv_rad1 TYPE char1,
+      gv_rad2 TYPE xfeld.
+
+DATA: gv_yas TYPE i.
+
+DATA: gv_id2    TYPE vrm_id,
+      gt_values TYPE vrm_values,
+      gs_value  TYPE vrm_value.
+
+DATA: gv_index TYPE i.
+
+DATA: gt_kayit TYPE TABLE OF zkurumsalcalisan,
+      gs_kayit TYPE zkurumsalcalisan.
+
+DATA: ok_code TYPE sy-ucomm.
+
+
+TABLES: zkurumsalcalisan.
+
+* Table control için gerekli tanımlar
+CONTROLS: calisanlar TYPE TABLEVIEW USING SCREEN 0400.
+
+DATA: g_calisanlar_itab TYPE TABLE OF zkurumsalcalisan,
+      g_calisanlar_wa   TYPE zkurumsalcalisan. " Work area
+
+" Sayfalama için başlangıç ve sayfa büyüklüğü değişkenleri
+DATA: gv_page_start TYPE i VALUE 0, " Başlangıç satırı
+      gv_page_size  TYPE i VALUE 50. " Sayfa başına satır sayısı
+
+
+DATA: p_search_name  TYPE zkurumsalcalisan-ad.
+DATA: p_search_surname TYPE zkurumsalcalisan-soyad.
+
+
+START-OF-SELECTION.
+  CALL SCREEN 0300.
+  CALL SCREEN 0100.
+  CALL SCREEN 0200.
+  CALL SCREEN 0400.
+*&---------------------------------------------------------------------*
+*& Module STATUS_0100 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS '0100'.
+* SET TITLEBAR 'xxx'.
+
+  gv_id2 = 'GV_YAS'.
+
+  gv_index = 18.
+
+  DO 60 TIMES.
+    gs_value-key = gv_index.
+    gs_value-text = gv_index.
+    APPEND gs_value TO gt_values.
+    gv_index = gv_index + 1.
+
+  ENDDO.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_id2
+      values = gt_values.
+ENDMODULE.
+***&---------------------------------------------------------------------*
+***&      Module  USER_COMMAND_0100  INPUT
+***&---------------------------------------------------------------------*
+***       text
+***----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+  CASE ok_code.
+
+    WHEN '&BACK'.
+      " Eğer kullanıcı geri butonuna bastıysa ekran değiştir
+      LEAVE TO SCREEN '0300'.
+
+    WHEN '&CLEAR'.
+      " Clear işlemi alanları temizler
+      CLEAR: gv_ad,
+             gv_soyad,
+             gv_yas,
+             gv_dogum,
+             gv_mail,
+             gv_sehir,
+             gv_telefon,
+             gv_id,
+            gv_rad1,
+            gv_rad2.
+    WHEN '&SAVE'.
+      " Kayıt işlemi yapılırken ilk önce boş alanların kontrol edilmesi
+      IF gv_id IS INITIAL.
+        MESSAGE 'ID alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT. " Modülden çık
+      ENDIF.
+
+      IF gv_ad IS INITIAL.
+        MESSAGE 'Ad alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT. " Modülden çık
+      ENDIF.
+
+      IF gv_soyad IS INITIAL.
+        MESSAGE 'Soyad alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      IF gv_dogum IS INITIAL.
+        MESSAGE 'Doğum Tarihi alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      IF gv_sehir IS INITIAL.
+        MESSAGE 'Şehir alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      IF gv_mail IS INITIAL.
+        MESSAGE 'E-posta alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      IF gv_yas IS INITIAL.
+        MESSAGE 'Yaş alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      IF gv_telefon IS INITIAL.
+        MESSAGE 'Telefon alanı doldurulmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      " Telefon numarasının uzunluğu kontrol edilir
+      IF strlen( gv_telefon ) <> 11.
+        MESSAGE 'Telefon numarası 11 haneli olmalıdır!' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      " Eğer tüm kontroller başarılıysa veriyi kaydet
+      gs_kayit-id = gv_id.
+      gs_kayit-ad = gv_ad.
+      gs_kayit-soyad = gv_soyad.
+      gs_kayit-dogum = gv_dogum.
+      gs_kayit-mail = gv_mail.
+      gs_kayit-sehir = gv_sehir.
+      gs_kayit-telefon = gv_telefon.
+      gs_kayit-yas = gv_yas.
+
+      IF gv_rad1 EQ abap_true.
+        gs_kayit-cinsiyet = 'E'.
+      ELSE.
+        gs_kayit-cinsiyet = 'K'.
+      ENDIF.
+
+      INSERT zkurumsalcalisan FROM gs_kayit.
+      IF sy-subrc = 0.
+        MESSAGE 'Yeni Çalışan Eklendi.' TYPE 'I'.
+      ELSE.
+        MESSAGE 'Çalışan Eklenemedi. Aynı IDye Sahip Çalışan Var.' TYPE 'I'.
+        EXIT.
+      ENDIF.
+
+      COMMIT WORK AND WAIT.
+
+
+
+  ENDCASE.
+
+ENDMODULE.
+
+*
+*
+*
+*
+**&---------------------------------------------------------------------*
+**& Module STATUS_0200 OUTPUT
+**&---------------------------------------------------------------------*
+**&
+**&---------------------------------------------------------------------*
+MODULE status_0200 OUTPUT.
+  SET PF-STATUS '0200'.
+* SET TITLEBAR 'xxx'.
+  gv_id2 = 'GV_YAS'.
+  gv_index = 18.
+
+  DO 60 TIMES.
+    gs_value-key = gv_index.
+    gs_value-text = gv_index.
+    APPEND gs_value TO gt_values.
+    gv_index = gv_index + 1.
+
+  ENDDO.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = gv_id2
+      values = gt_values.
+
+ENDMODULE.
+**&---------------------------------------------------------------------*
+**&      Module  USER_COMMAND_0200  INPUT
+**&---------------------------------------------------------------------*
+**       text
+**----------------------------------------------------------------------*
+MODULE user_command_0200 INPUT.
+  CASE ok_code.
+    WHEN '&BACK'.
+      LEAVE TO SCREEN '0300'.
+
+    WHEN '&SEARCH'.
+      SELECT SINGLE * FROM zkurumsalcalisan
+        INTO gs_kayit
+        WHERE id = gv_id.
+
+      IF sy-subrc = 0.
+        gv_ad      = gs_kayit-ad.
+        gv_soyad   = gs_kayit-soyad.
+        gv_dogum   = gs_kayit-dogum.
+        gv_mail    = gs_kayit-mail.
+        gv_sehir   = gs_kayit-sehir.
+        gv_telefon = gs_kayit-telefon.
+        gv_yas     = gs_kayit-yas.
+        IF gv_rad1 = abap_true.
+          gs_kayit-cinsiyet = 'E'.
+        ELSE.
+          gs_kayit-cinsiyet = 'K'.
+        ENDIF.
+        MESSAGE 'Çalışan bilgileri getirildi.' TYPE 'I'.
+      ELSE.
+        MESSAGE 'Çalışan bulunamadı.' TYPE 'I'.
+      ENDIF.
+    WHEN '&CLEAR'.
+      CLEAR: gv_ad,
+             gv_soyad,
+             gv_yas,
+             gv_dogum,
+             gv_mail,
+             gv_sehir,
+             gv_telefon,
+             gv_id,
+             gv_rad1,
+             gv_rad2.
+
+
+    WHEN '&DELETE'.
+
+      DATA: lv_answer    TYPE c,
+            lv_new_id    TYPE i,
+            lt_employees TYPE TABLE OF zkurumsalcalisan,
+            ls_employee  TYPE zkurumsalcalisan.
+
+      CALL FUNCTION 'POPUP_TO_CONFIRM'
+        EXPORTING
+          titlebar              = 'Silme Onayı'
+          text_question         = 'Çalışan kaydını silmek istediğinize emin misiniz?'
+          text_button_1         = 'Evet'
+          text_button_2         = 'Hayır'
+          default_button        = '2'
+          display_cancel_button = ' '
+        IMPORTING
+          answer                = lv_answer.
+
+      IF lv_answer = '1'.
+        DELETE FROM zkurumsalcalisan
+          WHERE id = gv_id.
+
+        IF sy-subrc = 0.
+          MESSAGE 'Çalışan başarıyla silindi.' TYPE 'I'.
+          CLEAR: gv_ad,
+                 gv_soyad,
+                 gv_dogum,
+                 gv_mail,
+                 gv_sehir,
+                 gv_telefon,
+                 gv_yas,
+                 gv_id,
+                 gv_rad1,
+                 gv_rad2.
+
+          COMMIT WORK AND WAIT.
+
+          SELECT * FROM zkurumsalcalisan
+            INTO TABLE lt_employees
+            ORDER BY id.
+
+        ELSE.
+          MESSAGE 'Çalışan silinemedi. ID bulunamadı.' TYPE 'I'.
+        ENDIF.
+
+      ELSE.
+        MESSAGE 'Silme işlemi iptal edildi.' TYPE 'I'.
+      ENDIF.
+
+
+    WHEN '&UPDATE'.
+      SELECT SINGLE * FROM zkurumsalcalisan
+        INTO gs_kayit
+        WHERE id = gv_id.
+
+      IF sy-subrc = 0.
+        gs_kayit-ad      = gv_ad.
+        gs_kayit-soyad   = gv_soyad.
+        gs_kayit-dogum   = gv_dogum.
+        gs_kayit-mail    = gv_mail.
+        gs_kayit-sehir   = gv_sehir.
+        gs_kayit-telefon = gv_telefon.
+        gs_kayit-yas     = gv_yas.
+
+        IF gv_rad1 = abap_true.
+          gs_kayit-cinsiyet = 'E'.
+        ELSE.
+          gs_kayit-cinsiyet = 'K'.
+        ENDIF.
+        IF strlen( gv_telefon ) <> 11.
+          MESSAGE 'Telefon numarası 11 haneli olmalıdır!' TYPE 'I'.
+          EXIT.
+        ENDIF.
+
+        UPDATE zkurumsalcalisan FROM gs_kayit.
+
+        IF sy-subrc = 0.
+          MESSAGE 'Çalışan bilgileri güncellendi.' TYPE 'I'.
+        ELSE.
+          MESSAGE 'Çalışan bilgileri güncellenemedi.' TYPE 'I'.
+        ENDIF.
+
+        COMMIT WORK AND WAIT.
+      ELSE.
+        MESSAGE 'Çalışan bulunamadı. Güncelleme yapılamadı.' TYPE 'I'.
+      ENDIF.
+
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_0300 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0300 OUTPUT.
+  SET PF-STATUS '0300'.
+* SET TITLEBAR 'xxx'.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0300  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0300 INPUT.
+  CASE ok_code.
+    WHEN '&ADD'.
+      LEAVE TO SCREEN '0100'.
+    WHEN '&UPDATE'.
+      LEAVE TO SCREEN '0200'.
+    WHEN '&LIST'.
+      CALL SCREEN '0400'.
+    WHEN '&CLOSE'.
+      LEAVE PROGRAM.
+  ENDCASE.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*& Module STATUS_0400 OUTPUT
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+MODULE status_0400 OUTPUT.
+  SET PF-STATUS '0400'.
+
+  LOOP AT g_calisanlar_itab INTO g_calisanlar_wa.
+    " Table Control'a verileri yazdır
+  ENDLOOP.
+
+ENDMODULE.
+
+
+*&---------------------------------------------------------------------*
+*& Module USER_COMMAND_0400 INPUT
+*&---------------------------------------------------------------------*
+MODULE user_command_0400 INPUT.
+  CASE ok_code.
+    WHEN '&BACK'.
+      LEAVE TO SCREEN '0300'. " Geri dönme işlemi
+
+    WHEN '&REFRESH'.
+      MESSAGE 'Veriler yenileniyor.' TYPE 'I'.
+
+      PERFORM load_page_data.
+
+    WHEN '&EXCEL'.
+      " Excel'e veri aktarma
+      DATA: lt_calisanlar TYPE TABLE OF zkurumsalcalisan,
+            lv_file       TYPE string,
+            lv_line       TYPE string,
+            lt_export     TYPE TABLE OF string, " Verileri string olarak tutacak tablo
+            lv_header     TYPE string,         " Kolon başlıklarını tutacak değişken
+            lv_id         TYPE string,         " ID'yi string'e dönüştürmek için eklenen değişken
+            lv_yas        TYPE string,         " Yas'ı string'e dönüştürmek için eklenen değişken
+            lv_result     TYPE abap_bool,      " file_exist sonucu abap_bool olmalı
+            lv_rc         TYPE i.              " file_delete sonucu integer olmalı
+
+      " Kayıtları zkurumsalcalisan tablosundan çek
+      SELECT * FROM zkurumsalcalisan INTO TABLE lt_calisanlar.
+
+      " Dosya yolu
+      lv_file = 'D:\calisanverileri\calisanlar.csv'.
+
+      " Dosya var mı kontrol et
+      CALL METHOD cl_gui_frontend_services=>file_exist
+        EXPORTING
+          file   = lv_file
+        RECEIVING
+          result = lv_result
+        EXCEPTIONS
+          OTHERS = 1.
+
+      IF lv_result = abap_true.
+        " Dosya varsa sil
+        CALL METHOD cl_gui_frontend_services=>file_delete
+          EXPORTING
+            filename           = lv_file
+          CHANGING
+            rc                 = lv_rc
+          EXCEPTIONS
+            file_delete_failed = 1
+            file_not_found     = 2
+            access_denied      = 3
+            OTHERS             = 4.
+
+        IF lv_rc = 0.
+          MESSAGE 'Dosya başarıyla silindi ve yeniden oluşturulacak.' TYPE 'I'.
+        ELSE.
+          MESSAGE 'Dosya silinirken hata oluştu.' TYPE 'E'.
+          EXIT. " Hata varsa işlem sonlandırılır.
+        ENDIF.
+      ELSE.
+        MESSAGE 'Dosya mevcut değil, yeni dosya oluşturulacak.' TYPE 'I'.
+      ENDIF.
+
+      " Yeni dosya oluşturma işleminden önce, başlık ve verilerin düzgün eklendiğini kontrol etmek için
+      CLEAR lt_export. " Eski verileri temizle.
+
+      " Başlıkları sadece ilk defa ekleyelim
+      lv_header = 'ID;Ad;Soyad;Doğum Tarihi;Mail;Şehir;Telefon;Yaş;Cinsiyet'.
+      APPEND lv_header TO lt_export.
+
+      " Verileri string formatına çevirerek ekleyelim
+      LOOP AT lt_calisanlar INTO DATA(ls_calisan).
+        " ID ve Yas'ı string formatına dönüştür
+        lv_id = ls_calisan-id.
+        lv_yas = ls_calisan-yas.
+
+        " CONCATENATE işlemi için diğer alanlarla birleştir
+        CONCATENATE lv_id
+                    ls_calisan-ad
+                    ls_calisan-soyad
+                    ls_calisan-dogum
+                    ls_calisan-mail
+                    ls_calisan-sehir
+                    ls_calisan-telefon
+                    lv_yas
+                    ls_calisan-cinsiyet INTO lv_line SEPARATED BY ';'.
+        APPEND lv_line TO lt_export.
+      ENDLOOP.
+
+      " GUI_DOWNLOAD ile verileri indir
+      CALL FUNCTION 'GUI_DOWNLOAD'
+        EXPORTING
+          filename              = lv_file
+          filetype              = 'ASC' " CSV formatında yazdırmak için
+          codepage              = '4110' " UTF-8 kodlaması
+          write_field_separator = ';'   " CSV formatında ayırıcı olarak noktalı virgül
+        TABLES
+          data_tab              = lt_export
+        EXCEPTIONS
+          file_write_error      = 1
+          OTHERS                = 2.
+
+      IF sy-subrc = 0.
+        MESSAGE 'Veriler Excel dosyasına aktarıldı.' TYPE 'I'.
+      ELSE.
+        MESSAGE 'Veriler Excel dosyasına aktarılamadı.' TYPE 'I'.
+      ENDIF.
+
+    WHEN '&SEARCH'.
+
+      PERFORM search_by_name USING  p_search_name .
+
+
+  ENDCASE.
+ENDMODULE.
+
+*databasedeki verileri uygulama içerisinde görme
+FORM load_page_data.
+  DATA: lv_total TYPE i.
+
+  " Veritabanındaki toplam kayıt sayısını al
+  SELECT COUNT(*) INTO @lv_total FROM zkurumsalcalisan.
+
+  " Sayfa limitine göre veritabanından veri çek
+  SELECT id, ad, soyad, sehir, mail, telefon, dogum, yas, cinsiyet
+    FROM zkurumsalcalisan
+    ORDER BY id
+    INTO TABLE @g_calisanlar_itab
+    UP TO @gv_page_size ROWS
+    OFFSET @gv_page_start.
+
+  IF sy-subrc = 0.
+    " Table control için satır sayısını güncelle
+    calisanlar-lines = lines( g_calisanlar_itab ).
+    MESSAGE 'Veriler yüklendi.' TYPE 'S'.
+  ELSE.
+    MESSAGE 'Veri çekme sırasında hata oluştu.' TYPE 'E'.
+  ENDIF.
+ENDFORM.
+
+
+
+FORM search_by_name USING lv_search_name TYPE zkurumsalcalisan-ad.
+  DATA: lv_name_temp TYPE zkurumsalcalisan-ad,
+        lv_total     TYPE i.
+
+  " Arama deseni oluşturma: % arama için joker karakter
+  lv_name_temp = lv_search_name.
+  CONCATENATE '%' lv_name_temp '%' INTO lv_name_temp.
+
+  " İsim ile veri çekme işlemi
+  SELECT id, ad, soyad, sehir, mail, telefon, dogum, yas, cinsiyet
+    FROM zkurumsalcalisan
+    WHERE ad LIKE @lv_name_temp
+    ORDER BY id
+    INTO TABLE @g_calisanlar_itab
+    UP TO @gv_page_size ROWS
+    OFFSET @gv_page_start.
+
+  IF sy-subrc = 0.
+    MESSAGE 'İsimle arama sonuçları yüklendi.' TYPE 'S'.
+  ELSE.
+    MESSAGE 'İsimle veri çekme sırasında hata oluştu.' TYPE 'E'.
+  ENDIF.
+
+ENDFORM.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+***&SPWIZARD: DATA DECLARATION FOR TABLECONTROL 'CALISANLAR'
+*&SPWIZARD: DEFINITION OF DDIC-TABLE
+*TABLES:   zkurumsalcalisan.
+
+*&SPWIZARD: TYPE FOR THE DATA OF TABLECONTROL 'CALISANLAR'
+TYPES: BEGIN OF t_calisanlar,
+         id       LIKE zkurumsalcalisan-id,
+         ad       LIKE zkurumsalcalisan-ad,
+         soyad    LIKE zkurumsalcalisan-soyad,
+         sehir    LIKE zkurumsalcalisan-sehir,
+         mail     LIKE zkurumsalcalisan-mail,
+         telefon  LIKE zkurumsalcalisan-telefon,
+         dogum    LIKE zkurumsalcalisan-dogum,
+         yas      LIKE zkurumsalcalisan-yas,
+         cinsiyet LIKE zkurumsalcalisan-cinsiyet,
+       END OF t_calisanlar.
+
+*&SPWIZARD: INTERNAL TABLE FOR TABLECONTROL 'CALISANLAR'
+*DATA: g_calisanlar_itab TYPE t_calisanlar OCCURS 0,
+*      g_calisanlar_wa   TYPE t_calisanlar. "work area
+DATA:     g_calisanlar_copied.           "copy flag
+
+*&SPWIZARD: DECLARATION OF TABLECONTROL 'CALISANLAR' ITSELF
+*CONTROLS: calisanlar TYPE TABLEVIEW USING SCREEN 0400.
+
+*&SPWIZARD: LINES OF TABLECONTROL 'CALISANLAR'
+DATA:     g_calisanlar_lines  LIKE sy-loopc.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'CALISANLAR'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: COPY DDIC-TABLE TO ITAB
+MODULE calisanlar_init OUTPUT.
+  IF g_calisanlar_copied IS INITIAL.
+*&SPWIZARD: COPY DDIC-TABLE 'ZKURUMSALCALISAN'
+*&SPWIZARD: INTO INTERNAL TABLE 'g_CALISANLAR_itab'
+    SELECT * FROM zkurumsalcalisan
+       INTO CORRESPONDING FIELDS
+       OF TABLE g_calisanlar_itab.
+    g_calisanlar_copied = 'X'.
+    REFRESH CONTROL 'CALISANLAR' FROM SCREEN '0400'.
+  ENDIF.
+ENDMODULE.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'CALISANLAR'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: MOVE ITAB TO DYNPRO
+MODULE calisanlar_move OUTPUT.
+  MOVE-CORRESPONDING g_calisanlar_wa TO zkurumsalcalisan.
+ENDMODULE.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'CALISANLAR'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: GET LINES OF TABLECONTROL
+MODULE calisanlar_get_lines OUTPUT.
+  g_calisanlar_lines = sy-loopc.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TC 'CALISANLAR'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: PROCESS USER COMMAND
+MODULE calisanlar_user_command INPUT.
+  ok_code = sy-ucomm.
+  PERFORM user_ok_tc USING    'CALISANLAR'
+                              'G_CALISANLAR_ITAB'
+                              'FLAG'
+                     CHANGING ok_code.
+  sy-ucomm = ok_code.
+ENDMODULE.
+
+*----------------------------------------------------------------------*
+*   INCLUDE TABLECONTROL_FORMS                                         *
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  USER_OK_TC                                               *
+*&---------------------------------------------------------------------*
+FORM user_ok_tc USING    p_tc_name TYPE dynfnam
+                         p_table_name
+                         p_mark_name
+                CHANGING p_ok      LIKE sy-ucomm.
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA: l_ok     TYPE sy-ucomm,
+        l_offset TYPE i.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+*&SPWIZARD: Table control specific operations                          *
+*&SPWIZARD: evaluate TC name and operations                            *
+  SEARCH p_ok FOR p_tc_name.
+  IF sy-subrc <> 0.
+    EXIT.
+  ENDIF.
+  l_offset = strlen( p_tc_name ) + 1.
+  l_ok = p_ok+l_offset.
+*&SPWIZARD: execute general and TC specific operations                 *
+  CASE l_ok.
+    WHEN 'INSR'.                      "insert row
+      PERFORM fcode_insert_row USING    p_tc_name
+                                        p_table_name.
+      CLEAR p_ok.
+
+    WHEN 'DELE'.                      "delete row
+      PERFORM fcode_delete_row USING    p_tc_name
+                                        p_table_name
+                                        p_mark_name.
+      CLEAR p_ok.
+
+    WHEN 'P--' OR                     "top of list
+         'P-'  OR                     "previous page
+         'P+'  OR                     "next page
+         'P++'.                       "bottom of list
+      PERFORM compute_scrolling_in_tc USING p_tc_name
+                                            l_ok.
+      CLEAR p_ok.
+*     WHEN 'L--'.                       "total left
+*       PERFORM FCODE_TOTAL_LEFT USING P_TC_NAME.
+*
+*     WHEN 'L-'.                        "column left
+*       PERFORM FCODE_COLUMN_LEFT USING P_TC_NAME.
+*
+*     WHEN 'R+'.                        "column right
+*       PERFORM FCODE_COLUMN_RIGHT USING P_TC_NAME.
+*
+*     WHEN 'R++'.                       "total right
+*       PERFORM FCODE_TOTAL_RIGHT USING P_TC_NAME.
+*
+    WHEN 'MARK'.                      "mark all filled lines
+      PERFORM fcode_tc_mark_lines USING p_tc_name
+                                        p_table_name
+                                        p_mark_name   .
+      CLEAR p_ok.
+
+    WHEN 'DMRK'.                      "demark all filled lines
+      PERFORM fcode_tc_demark_lines USING p_tc_name
+                                          p_table_name
+                                          p_mark_name .
+      CLEAR p_ok.
+
+*     WHEN 'SASCEND'   OR
+*          'SDESCEND'.                  "sort column
+*       PERFORM FCODE_SORT_TC USING P_TC_NAME
+*                                   l_ok.
+
+  ENDCASE.
+
+ENDFORM.                              " USER_OK_TC
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_INSERT_ROW                                         *
+*&---------------------------------------------------------------------*
+FORM fcode_insert_row
+              USING    p_tc_name           TYPE dynfnam
+                       p_table_name             .
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA l_lines_name       LIKE feld-name.
+  DATA l_selline          LIKE sy-stepl.
+  DATA l_lastline         TYPE i.
+  DATA l_line             TYPE i.
+  DATA l_table_name       LIKE feld-name.
+  FIELD-SYMBOLS <tc>                 TYPE cxtab_control.
+  FIELD-SYMBOLS <table>              TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <lines>              TYPE i.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (p_tc_name) TO <tc>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+  CONCATENATE p_table_name '[]' INTO l_table_name. "table body
+  ASSIGN (l_table_name) TO <table>.                "not headerline
+
+*&SPWIZARD: get looplines of TableControl                              *
+  CONCATENATE 'G_' p_tc_name '_LINES' INTO l_lines_name.
+  ASSIGN (l_lines_name) TO <lines>.
+
+*&SPWIZARD: get current line                                           *
+  GET CURSOR LINE l_selline.
+  IF sy-subrc <> 0.                   " append line to table
+    l_selline = <tc>-lines + 1.
+*&SPWIZARD: set top line                                               *
+    IF l_selline > <lines>.
+      <tc>-top_line = l_selline - <lines> + 1 .
+    ELSE.
+      <tc>-top_line = 1.
+    ENDIF.
+  ELSE.                               " insert line into table
+    l_selline = <tc>-top_line + l_selline - 1.
+    l_lastline = <tc>-top_line + <lines> - 1.
+  ENDIF.
+*&SPWIZARD: set new cursor line                                        *
+  l_line = l_selline - <tc>-top_line + 1.
+
+*&SPWIZARD: insert initial line                                        *
+  INSERT INITIAL LINE INTO <table> INDEX l_selline.
+  <tc>-lines = <tc>-lines + 1.
+*&SPWIZARD: set cursor                                                 *
+  SET CURSOR LINE l_line.
+
+ENDFORM.                              " FCODE_INSERT_ROW
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_DELETE_ROW                                         *
+*&---------------------------------------------------------------------*
+FORM fcode_delete_row
+              USING    p_tc_name           TYPE dynfnam
+                       p_table_name
+                       p_mark_name   .
+
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA l_table_name       LIKE feld-name.
+
+  FIELD-SYMBOLS <tc>         TYPE cxtab_control.
+  FIELD-SYMBOLS <table>      TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <wa>.
+  FIELD-SYMBOLS <mark_field>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (p_tc_name) TO <tc>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+  CONCATENATE p_table_name '[]' INTO l_table_name. "table body
+  ASSIGN (l_table_name) TO <table>.                "not headerline
+
+*&SPWIZARD: delete marked lines                                        *
+  DESCRIBE TABLE <table> LINES <tc>-lines.
+
+  LOOP AT <table> ASSIGNING <wa>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+    ASSIGN COMPONENT p_mark_name OF STRUCTURE <wa> TO <mark_field>.
+
+    IF <mark_field> = 'X'.
+      DELETE <table> INDEX syst-tabix.
+      IF sy-subrc = 0.
+        <tc>-lines = <tc>-lines - 1.
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
+ENDFORM.                              " FCODE_DELETE_ROW
+
+*&---------------------------------------------------------------------*
+*&      Form  COMPUTE_SCROLLING_IN_TC
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*      -->P_OK       ok code
+*----------------------------------------------------------------------*
+FORM compute_scrolling_in_tc USING    p_tc_name
+                                      p_ok.
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA l_tc_new_top_line     TYPE i.
+  DATA l_tc_name             LIKE feld-name.
+  DATA l_tc_lines_name       LIKE feld-name.
+  DATA l_tc_field_name       LIKE feld-name.
+
+  FIELD-SYMBOLS <tc>         TYPE cxtab_control.
+  FIELD-SYMBOLS <lines>      TYPE i.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (p_tc_name) TO <tc>.
+*&SPWIZARD: get looplines of TableControl                              *
+  CONCATENATE 'G_' p_tc_name '_LINES' INTO l_tc_lines_name.
+  ASSIGN (l_tc_lines_name) TO <lines>.
+
+
+*&SPWIZARD: is no line filled?                                         *
+  IF <tc>-lines = 0.
+*&SPWIZARD: yes, ...                                                   *
+    l_tc_new_top_line = 1.
+  ELSE.
+*&SPWIZARD: no, ...                                                    *
+    CALL FUNCTION 'SCROLLING_IN_TABLE'
+      EXPORTING
+        entry_act      = <tc>-top_line
+        entry_from     = 1
+        entry_to       = <tc>-lines
+        last_page_full = 'X'
+        loops          = <lines>
+        ok_code        = p_ok
+        overlapping    = 'X'
+      IMPORTING
+        entry_new      = l_tc_new_top_line
+      EXCEPTIONS
+*       NO_ENTRY_OR_PAGE_ACT  = 01
+*       NO_ENTRY_TO    = 02
+*       NO_OK_CODE_OR_PAGE_GO = 03
+        OTHERS         = 0.
+  ENDIF.
+
+*&SPWIZARD: get actual tc and column                                   *
+  GET CURSOR FIELD l_tc_field_name
+             AREA  l_tc_name.
+
+  IF syst-subrc = 0.
+    IF l_tc_name = p_tc_name.
+*&SPWIZARD: et actual column                                           *
+      SET CURSOR FIELD l_tc_field_name LINE 1.
+    ENDIF.
+  ENDIF.
+
+*&SPWIZARD: set the new top line                                       *
+  <tc>-top_line = l_tc_new_top_line.
+
+
+ENDFORM.                              " COMPUTE_SCROLLING_IN_TC
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_TC_MARK_LINES
+*&---------------------------------------------------------------------*
+*       marks all TableControl lines
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*----------------------------------------------------------------------*
+FORM fcode_tc_mark_lines USING p_tc_name
+                               p_table_name
+                               p_mark_name.
+*&SPWIZARD: EGIN OF LOCAL DATA-----------------------------------------*
+  DATA l_table_name       LIKE feld-name.
+
+  FIELD-SYMBOLS <tc>         TYPE cxtab_control.
+  FIELD-SYMBOLS <table>      TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <wa>.
+  FIELD-SYMBOLS <mark_field>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (p_tc_name) TO <tc>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+  CONCATENATE p_table_name '[]' INTO l_table_name. "table body
+  ASSIGN (l_table_name) TO <table>.                "not headerline
+
+*&SPWIZARD: mark all filled lines                                      *
+  LOOP AT <table> ASSIGNING <wa>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+    ASSIGN COMPONENT p_mark_name OF STRUCTURE <wa> TO <mark_field>.
+
+    <mark_field> = 'X'.
+  ENDLOOP.
+ENDFORM.                                          "fcode_tc_mark_lines
+
+*&---------------------------------------------------------------------*
+*&      Form  FCODE_TC_DEMARK_LINES
+*&---------------------------------------------------------------------*
+*       demarks all TableControl lines
+*----------------------------------------------------------------------*
+*      -->P_TC_NAME  name of tablecontrol
+*----------------------------------------------------------------------*
+FORM fcode_tc_demark_lines USING p_tc_name
+                                 p_table_name
+                                 p_mark_name .
+*&SPWIZARD: BEGIN OF LOCAL DATA----------------------------------------*
+  DATA l_table_name       LIKE feld-name.
+
+  FIELD-SYMBOLS <tc>         TYPE cxtab_control.
+  FIELD-SYMBOLS <table>      TYPE STANDARD TABLE.
+  FIELD-SYMBOLS <wa>.
+  FIELD-SYMBOLS <mark_field>.
+*&SPWIZARD: END OF LOCAL DATA------------------------------------------*
+
+  ASSIGN (p_tc_name) TO <tc>.
+
+*&SPWIZARD: get the table, which belongs to the tc                     *
+  CONCATENATE p_table_name '[]' INTO l_table_name. "table body
+  ASSIGN (l_table_name) TO <table>.                "not headerline
+
+*&SPWIZARD: demark all filled lines                                    *
+  LOOP AT <table> ASSIGNING <wa>.
+
+*&SPWIZARD: access to the component 'FLAG' of the table header         *
+    ASSIGN COMPONENT p_mark_name OF STRUCTURE <wa> TO <mark_field>.
+
+    <mark_field> = space.
+  ENDLOOP.
+ENDFORM.                                          "fcode_tc_mark_lines
